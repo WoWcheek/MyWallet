@@ -3,13 +3,13 @@ using Microsoft.EntityFrameworkCore;
 
 namespace MyWallet.Models;
 
-public partial class walletContext : DbContext
+public partial class WalletContext : DbContext
 {
-    public walletContext()
+    public WalletContext()
     {
     }
 
-    public walletContext(DbContextOptions<walletContext> options)
+    public WalletContext(DbContextOptions<WalletContext> options)
         : base(options)
     {
     }
@@ -34,6 +34,7 @@ public partial class walletContext : DbContext
         {
             entity.HasKey(e => e.id).HasName("PK__Expenses__3213E83FAA63AB8A");
 
+            entity.Property(e => e.amount).HasColumnType("money");
             entity.Property(e => e.description)
                 .HasMaxLength(256)
                 .IsUnicode(false);
@@ -62,6 +63,7 @@ public partial class walletContext : DbContext
         {
             entity.HasKey(e => e.id).HasName("PK__Incomes__3213E83FB1DBAE5B");
 
+            entity.Property(e => e.amount).HasColumnType("money");
             entity.Property(e => e.description)
                 .HasMaxLength(256)
                 .IsUnicode(false);
@@ -90,11 +92,13 @@ public partial class walletContext : DbContext
         {
             entity.HasKey(e => e.id).HasName("PK__Users__3213E83FF260890A");
 
-            entity.Property(e => e.name)
+            entity.HasIndex(e => e.username, "UQ__Users__F3DBC57260AB0B11").IsUnique();
+
+            entity.Property(e => e.password)
                 .IsRequired()
                 .HasMaxLength(50)
                 .IsUnicode(false);
-            entity.Property(e => e.password)
+            entity.Property(e => e.username)
                 .IsRequired()
                 .HasMaxLength(50)
                 .IsUnicode(false);

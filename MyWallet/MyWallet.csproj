@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="7.0.16" />
+    <PackageReference Include="MindFusion.Charting" Version="4.2.0" />
   </ItemGroup>
 
 </Project>

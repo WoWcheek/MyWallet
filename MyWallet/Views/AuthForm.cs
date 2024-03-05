@@ -7,11 +7,13 @@ namespace MyWallet.Views
     {
         private UserController userController;
         public User? ActiveUser { get; private set; }
+        public bool AuthExited { get; private set; }
 
         public AuthForm()
         {
             InitializeComponent();
             userController = new UserController();
+            AuthExited = false;
         }
 
         private void registerBtn_Click(object sender, EventArgs e)
@@ -49,6 +51,14 @@ namespace MyWallet.Views
             else
             {
                 MessageBox.Show("Wrong password or username!", "Login status", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void AuthForm_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            if (e.CloseReason == CloseReason.UserClosing)
+            {
+                AuthExited = true;
             }
         }
     }

@@ -14,6 +14,8 @@ public partial class Expense
 
     public DateTime received_at { get; set; }
 
+    public decimal amount { get; set; }
+
     public virtual ExpensesCategory category { get; set; }
 
     public virtual User user { get; set; }

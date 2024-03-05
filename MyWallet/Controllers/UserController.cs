@@ -4,18 +4,18 @@ namespace MyWallet.Controllers
 {
     public class UserController
     {
-        private walletContext context;
+        private WalletContext context;
 
         public UserController()
         {
-            context = new walletContext();
+            context = new WalletContext();
         }
 
-        public User? Register(string name, string password)
+        public User? Register(string username, string password)
         {
             try
             {
-                User newUser = new User() { name = name, password = password };
+                User newUser = new User() { username = username, password = password };
                 context.Users.Add(newUser);
                 context.SaveChanges();
                 return newUser;
@@ -26,11 +26,11 @@ namespace MyWallet.Controllers
             }
         }
 
-        public User? Login(string name, string password)
+        public User? Login(string username, string password)
         {
             try
             {
-                User? loggedInUser = context.Users.ToList().FirstOrDefault(user => user.name == name && user.password == password);
+                User? loggedInUser = context.Users.ToList().FirstOrDefault(user => user.username == username && user.password == password);
                 return loggedInUser;
             }
             catch

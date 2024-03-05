@@ -121,7 +121,9 @@
             Controls.Add(nameLbl);
             FormBorderStyle = FormBorderStyle.FixedSingle;
             Name = "AuthForm";
+            StartPosition = FormStartPosition.CenterScreen;
             Text = "AuthForm";
+            FormClosing += AuthForm_FormClosing;
             ResumeLayout(false);
             PerformLayout();
         }
