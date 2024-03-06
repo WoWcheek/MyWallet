@@ -18,6 +18,7 @@ namespace MyWallet.Controllers
                 User newUser = new User() { username = username, password = password };
                 context.Users.Add(newUser);
                 context.SaveChanges();
+                newUser = context.Users.First(x => x.username == username);
                 return newUser;
             }
             catch

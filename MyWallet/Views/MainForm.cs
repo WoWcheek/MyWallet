@@ -6,24 +6,69 @@ using MyWallet.Views.UserControls;
 
 namespace MyWallet
 {
+    public enum AppState { Home, Income, Expense }
+
     public partial class MainForm : Form
     {
         private IncomeController incomeController;
         private ExpenseController expenseController;
+        private List<Color> colors;
+
         private User? ActiveUser { get; set; }
+
+        private AppState _state;
+        private AppState State
+        {
+            get => _state;
+
+            set
+            {
+                switch (value)
+                {
+                    case AppState.Home:
+                        mainLineChart.Visible = listPanel.Visible = false;
+                        incomesPC.Visible = expensesPC.Visible = true;
+                        RemoveTopItems();
+                        ReloadHomeInfo();
+                        break;
+
+                    case AppState.Income:
+                        mainLineChart.Visible = listPanel.Visible = true;
+                        incomesPC.Visible = expensesPC.Visible = false;
+                        RemoveTopItems();
+                        break;
+
+                    case AppState.Expense:
+                        mainLineChart.Visible = listPanel.Visible = true;
+                        incomesPC.Visible = expensesPC.Visible = false;
+                        RemoveTopItems();
+                        break;
+
+                    default:
+                        throw new NotImplementedException();
+                }
+                _state = value;
+            }
+        }
 
         public MainForm()
         {
             InitializeComponent();
-            mainLineChart.ShowLegend = false;
-
-            incomeController = new IncomeController();
-            expenseController = new ExpenseController();
+            mainLineChart.ShowLegend = incomesPC.ShowLegend = expensesPC.ShowLegend = false;
+            incomesPC.Theme.DataLabelsFontSize = 10;
+            expensesPC.Theme.DataLabelsFontSize = 10;
+            InitColor();
 
             ExecuteWithHideMainPanel(GetAuthUser);
             usernameLbl.Text = ActiveUser?.username;
 
-            homeBtn.PerformClick();
+            incomeController = new IncomeController();
+            expenseController = new ExpenseController();
+
+            var incomes = incomeController.GetUserIncomes(ActiveUser);
+            var expenses = expenseController.GetUserExpenses(ActiveUser);
+
+            State = AppState.Home;
         }
 
         private void ExecuteWithHideMainPanel(Action action)
@@ -50,12 +95,21 @@ namespace MyWallet
 
         private void homeBtn_Click(object sender, EventArgs e)
         {
+            State = AppState.Home;
+        }
+
+        private void ReloadHomeInfo(object? sender = null, EventArgs? e = null)
+        {
+            SetPieCharts();
+            SetStatsItems();
         }
 
         private void incomeBtn_Click(object sender, EventArgs e)
         {
             if (ActiveUser is null)
                 return;
+
+            State = AppState.Income;
 
             List<Income> userIncomes = incomeController.GetUserIncomes(ActiveUser).OrderBy(x => x.received_at).ToList();
             userIncomes = ListWithCategories(userIncomes);
@@ -66,8 +120,13 @@ namespace MyWallet
                                                                             (group.Key, group.Sum(income => income.amount)))
                                                                     .OrderBy(x => x.First)
                                                                     .ToList();
-            DateTime minDate = userIncomes.MinBy(x => x.received_at).received_at;
-            DateTime maxDate = userIncomes.MaxBy(x => x.received_at).received_at;
+
+            DateTime minDate = userIncomes.Count > 0 ?
+                                userIncomes.MinBy(x => x.received_at).received_at :
+                                DateTime.Now;
+            DateTime maxDate = userIncomes.Count > 0 ?
+                                userIncomes.MaxBy(x => x.received_at).received_at :
+                                DateTime.Now;
             List<DateTime> dates = DateBounds(minDate, maxDate);
 
             List<double> userIncomesValues = ExpandValuesForDates(userIncomesDatesValues, dates);
@@ -81,6 +140,11 @@ namespace MyWallet
 
         private void expensesBtn_Click(object sender, EventArgs e)
         {
+            if (ActiveUser is null)
+                return;
+
+            State = AppState.Expense;
+
             List<Expense> userExpenses = expenseController.GetUserExpenses(ActiveUser).OrderBy(x => x.received_at).ToList();
             userExpenses = ListWithCategories(userExpenses);
             List<Pair<DateTime, decimal>> userExpensesDatesValues = userExpenses
@@ -90,11 +154,13 @@ namespace MyWallet
                                                                              (group.Key, group.Sum(income => income.amount)))
                                                                      .OrderBy(x => x.First)
                                                                      .ToList();
-            DateTime expenseMinDate = userExpenses.ToList().MinBy(x => x.received_at).received_at;
-            DateTime expenseMaxDate = userExpenses.ToList().MaxBy(x => x.received_at).received_at;
 
-            DateTime minDate = userExpenses.MinBy(x => x.received_at).received_at;
-            DateTime maxDate = userExpenses.MaxBy(x => x.received_at).received_at;
+            DateTime minDate = userExpenses.Count > 0 ?
+                                userExpenses.MinBy(x => x.received_at).received_at :
+                                DateTime.Now;
+            DateTime maxDate = userExpenses.Count > 0 ?
+                                userExpenses.MaxBy(x => x.received_at).received_at :
+                                DateTime.Now;
             List<DateTime> dates = DateBounds(minDate, maxDate);
 
             List<double> userExpensesValues = ExpandValuesForDates(userExpensesDatesValues, dates);
@@ -160,16 +226,146 @@ namespace MyWallet
             mainLineChart.Series.Add(series);
         }
 
+        private void SetPieCharts()
+        {
+            List<IncomesCategory> incomesByCategories = incomeController.GetIncomesCategoriesByUser(ActiveUser);
+            Dictionary<string, double> incomesDict = new Dictionary<string, double>();
+            foreach (var category in incomesByCategories)
+            {
+                if (category.Incomes.Count == 0)
+                    continue;
+
+                incomesDict.Add(category.category_name, 0);
+                foreach (var income in category.Incomes)
+                {
+                    incomesDict[category.category_name] += (double)income.amount;
+                }
+            }
+
+            List<ExpensesCategory> expensesByCategories = expenseController.GetExpensesCategoriesByUser(ActiveUser);
+            Dictionary<string, double> expensesDict = new Dictionary<string, double>();
+            foreach (var category in expensesByCategories)
+            {
+                if (category.Expenses.Count == 0)
+                    continue;
+
+                expensesDict.Add(category.category_name, 0);
+                foreach (var expense in category.Expenses)
+                {
+                    expensesDict[category.category_name] += (double)expense.amount;
+                }
+            }
+
+            List<string> incomesInnerLabels = incomesDict.Values.Select(x => x.ToString()).ToList();
+            List<string> expensesInnerLabels = expensesDict.Values.Select(x => x.ToString()).ToList();
+
+            incomesPC.Series = new PieSeries(incomesDict.Values.ToList(), incomesInnerLabels, incomesDict.Keys.ToList());
+            expensesPC.Series = new PieSeries(expensesDict.Values.ToList(), expensesInnerLabels, expensesDict.Keys.ToList());
+
+            SetPieChartsStyles();
+        }
+
+        private void RemoveTopItems()
+        {
+            mainPanel.Controls.RemoveByKey("topIncomeItem");
+            mainPanel.Controls.RemoveByKey("topExpenseItem");
+            mainPanel.Controls.RemoveByKey("summaryItem");
+        }
+
+        private void SetStatsItems()
+        {
+            SetTopItems();
+
+            decimal totalIncome = incomeController.GetUserIncomes(ActiveUser).Sum(x => x.amount);
+            decimal totalExpense = expenseController.GetUserExpenses(ActiveUser).Sum(x => x.amount);
+
+            mainPanel.Controls.Add(new SummaryUC(totalIncome, totalExpense)
+            {
+                Name = "summaryItem",
+                Location = new Point(400, 550)
+            });
+        }
+
+        private void SetTopItems()
+        {
+            if (ActiveUser is null)
+                return;
+
+            Income? topIncome = incomeController.GetUserIncomes(ActiveUser).MaxBy(x => x.amount);
+            Expense? topExpense = expenseController.GetUserExpenses(ActiveUser).MaxBy(x => x.amount);
+
+            if (topIncome is not null)
+                mainPanel.Controls.Add(new ItemUC(topIncome, incomeController, false)
+                {
+                    Name = "topIncomeItem",
+                    Location = new Point(400, 400)
+                });
+            if (topExpense is not null)
+                mainPanel.Controls.Add(new ItemUC(topExpense, expenseController, false)
+                {
+                    Name = "topExpenseItem",
+                    Location = new Point(950, 400)
+                });
+        }
+
+        private void SetPieChartsStyles()
+        {
+            int incomesElemCount = incomesPC.Series.Size;
+            int expensesElemCount = expensesPC.Series.Size;
+
+            List<MindFusion.Drawing.Brush> brushesIncome = new List<MindFusion.Drawing.Brush>();
+            for (int i = 0; i < incomesElemCount; i++)
+            {
+                brushesIncome.Add(new MindFusion.Drawing.SolidBrush(colors[i]));
+            }
+
+            List<MindFusion.Drawing.Brush> brushesExpense = new List<MindFusion.Drawing.Brush>();
+            for (int i = 0; i < expensesElemCount; i++)
+            {
+                brushesExpense.Add(new MindFusion.Drawing.SolidBrush(colors[i]));
+            }
+
+            incomesPC.Plot.SeriesStyle = new PerElementSeriesStyle()
+            {
+                Fills = new List<List<MindFusion.Drawing.Brush>>() { brushesIncome }
+            };
+            expensesPC.Plot.SeriesStyle = new PerElementSeriesStyle()
+            {
+                Fills = new List<List<MindFusion.Drawing.Brush>>() { brushesExpense }
+            };
+        }
+
+        private void InitColor()
+        {
+            colors = new List<Color>()
+            {
+                Color.FromArgb(0, 114, 178),     // Blue
+                Color.FromArgb(230, 159, 0),     // Orange
+                Color.FromArgb(86, 180, 233),    // Sky Blue
+                Color.FromArgb(0, 158, 115),     // Green
+                Color.FromArgb(240, 228, 66),    // Yellow
+                Color.FromArgb(213, 94, 0),      // Orange-Red
+                Color.FromArgb(204, 121, 167),   // Pink
+                Color.FromArgb(240, 228, 66),    // Yellow
+                Color.FromArgb(0, 114, 178),     // Blue
+                Color.FromArgb(86, 180, 233),    // Sky Blue
+                Color.FromArgb(213, 94, 0),      // Orange-Red
+                Color.FromArgb(0, 158, 115),     // Green
+                Color.FromArgb(204, 121, 167),   // Pink
+                Color.FromArgb(240, 228, 66),    // Yellow
+                Color.FromArgb(227, 119, 194)    // Purple
+            };
+        }
+
         private void SetItemsList(List<Income> incomes)
         {
             const int xPadding = 10;
             const int yPadding = 5;
 
             listPanel.Controls.Clear();
-            listPanel.Name = "Incomes";
             for (int i = 0; i < incomes.Count; i++)
             {
-                ItemUC incomeItem = new ItemUC(incomes[i]) { Name = $"item{i}" };
+                ItemUC incomeItem = new ItemUC(incomes[i], incomeController) { Name = $"item{i}" };
                 incomeItem.Disposed += ResetStatistics;
                 listPanel.Controls.Add(incomeItem);
                 listPanel.Controls[$"item{i}"].Left = xPadding;
@@ -183,10 +379,9 @@ namespace MyWallet
             const int yPadding = 5;
 
             listPanel.Controls.Clear();
-            listPanel.Name = "Expenses";
             for (int i = 0; i < expenses.Count; i++)
             {
-                ItemUC expenseItem = new ItemUC(expenses[i]) { Name = $"item{i}" };
+                ItemUC expenseItem = new ItemUC(expenses[i], expenseController) { Name = $"item{i}" };
                 expenseItem.Disposed += ResetStatistics;
                 listPanel.Controls.Add(expenseItem);
                 listPanel.Controls[$"item{i}"].Left = xPadding;
@@ -194,12 +389,37 @@ namespace MyWallet
             }
         }
 
-        private void ResetStatistics(object sender, EventArgs e)
+        private void ResetStatistics(object? sender, EventArgs? e) => State = State;
+
+        private void logOutLbl_Click(object sender, EventArgs e)
         {
-            if (listPanel.Name == "Incomes")
-                incomeBtn.PerformClick();
-            else if (listPanel.Name == "Expenses")
-                expensesBtn.PerformClick();
+            ExecuteWithHideMainPanel(GetAuthUser);
+            usernameLbl.Text = ActiveUser?.username;
+
+            var incomes = incomeController.GetUserIncomes(ActiveUser);
+            var expenses = expenseController.GetUserExpenses(ActiveUser);
+
+            State = AppState.Home;
+        }
+
+        private void newIncomeBtn_Click(object sender, EventArgs e)
+        {
+            if (ActiveUser is null)
+                return;
+
+            AddForm addIncomeForm = new AddForm(incomeController, ActiveUser.id);
+            addIncomeForm.Disposed += ResetStatistics;
+            addIncomeForm.ShowDialog();
+        }
+
+        private void newExpenseBtn_Click(object sender, EventArgs e)
+        {
+            if (ActiveUser is null)
+                return;
+
+            AddForm addExpenseForm = new AddForm(expenseController, ActiveUser.id);
+            addExpenseForm.Disposed += ResetStatistics;
+            addExpenseForm.ShowDialog();
         }
     }
 }

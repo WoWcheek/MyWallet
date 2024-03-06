@@ -5,7 +5,9 @@ namespace MyWallet.Views.UserControls
 {
     public partial class ItemUC : UserControl
     {
-        bool isIncome;
+        private IncomeController? incomeController;
+        private ExpenseController? expenseController;
+
         private int id;
 
         public ItemUC()
@@ -13,38 +15,42 @@ namespace MyWallet.Views.UserControls
             InitializeComponent();
         }
 
-        public ItemUC(Income income) : this()
+        public ItemUC(Income income, IncomeController controller, bool showDelete=true) : this()
         {
-            isIncome = true;
+            incomeController = controller;
+
             id = income.id;
             categoryLbl.Text = income.category.category_name;
             amountLbl.Text = Math.Round(income.amount).ToString() + " UAH";
             descriptionLbl.Text = income.description;
             dateLbl.Text = income.received_at.ToShortDateString();
+
+            deleteBtn.Visible = showDelete;
         }
 
-        public ItemUC(Expense expense) : this()
+        public ItemUC(Expense expense, ExpenseController controller, bool showDelete=true) : this()
         {
-            isIncome = false;
+            expenseController = controller;
+
             id = expense.id;
             categoryLbl.Text = expense.category.category_name;
             amountLbl.Text = Math.Round(expense.amount).ToString() + " UAH";
             descriptionLbl.Text = expense.description;
             dateLbl.Text = expense.received_at.ToShortDateString();
+
+            deleteBtn.Visible = showDelete;
         }
 
         private void deleteBtn_Click(object sender, EventArgs e)
         {
-            if (isIncome)
+            if (incomeController is not null)
             {
-                IncomeController controller = new IncomeController();
-                if (controller.DeleteIncomeById(id))
+                if (incomeController.DeleteIncomeById(id))
                     Dispose();
             }
-            else
+            else if (expenseController is not null)
             {
-                ExpenseController controller = new ExpenseController();
-                if (controller.DeleteExpenseById(id))
+                if (expenseController.DeleteExpenseById(id))
                     Dispose();
             }
         }
